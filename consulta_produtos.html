@@ -253,11 +253,11 @@ function readFile(file){const rd=new FileReader();rd.onload=e=>{try{
 
 function buildDB(rows,fname,fromCloud){
   const h=rows[0];
-  const cCod=findCol(h,['Código','Codigo','Cod','Item']);
-  const cDesc=findCol(h,['Descrição','Descricao','Desc']);
-  const cForn=findCol(h,['Fornecedor']);
-  const cQtd=findCol(h,['Quantidade','Qtd','Estoque','Est','Saldo']);
-  const cLoc=findCol(h,['Locação','Locacao','Local','Endereço']);
+  const cCod=findCol(h,['Cod Item','Código do Item','Codigo do Item','Código','Codigo','Cod','Item']);
+  const cDesc=findCol(h,['Descricao','Descrição','Desc']);
+  const cForn=findCol(h,['Nome Fornecedor','Fornecedor']);
+  const cQtd=findCol(h,['Qtde','Quantidade','Qtd','Est.','Estoque','Est','Saldo']);
+  const cLoc=findCol(h,['Locacao','Locação','Local Estoque','Local','Endereço']);
   if(cCod<0){if(!fromCloud)alert('Coluna "Código" não encontrada.');return false;}
   DB=[];INDEX={};
   for(let i=1;i<rows.length;i++){const r=rows[i];const cod=r[cCod];
