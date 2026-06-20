@@ -228,8 +228,21 @@ $('btnPick').onclick=e=>{e.stopPropagation();fileInput.click();};
 $('btnReimport').onclick=e=>{e.stopPropagation();fileInput.click();};
 fileInput.onchange=e=>{if(e.target.files[0])readFile(e.target.files[0]);};
 function rowsFromArrayBuffer(buf){
-  // lê CSV ou XLSX; força leitura como texto p/ CSV preservar acentos
-  const wb=XLSX.read(buf,{type:'array',codepage:65001,raw:false});
+  const bytes=new Uint8Array(buf);
+  // tenta detectar se é CSV (texto) ou XLSX (binário, começa com PK)
+  const isZip = bytes[0]===0x50 && bytes[1]===0x4B; // 'PK' = xlsx/zip
+  if(!isZip){
+    // CSV: decodifica como UTF-8; se houver caractere inválido, cai p/ latin1 (Windows/Excel BR)
+    let text;
+    try{ text=new TextDecoder('utf-8',{fatal:false}).decode(bytes); }
+    catch(e){ text=null; }
+    if(text==null || /\uFFFD/.test(text)){
+      text=new TextDecoder('windows-1252').decode(bytes); // acentos do Excel BR
+    }
+    const wb=XLSX.read(text,{type:'string',raw:false}); // SheetJS detecta ; ou , sozinho
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+  }
+  const wb=XLSX.read(buf,{type:'array'});
   return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
 }
 function readFile(file){const rd=new FileReader();rd.onload=e=>{try{
@@ -347,17 +360,20 @@ $('installX').onclick=()=>{$('installTip').classList.add('hidden');idbSet('hideT
 const isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
 
 /* ---------- Base compartilhada (mesmo repositório) ---------- */
-const CLOUD_FILE='Lista.xlsx'; // arquivo fixo no GitHub; troque este p/ atualizar a base de todos
+// tenta CSV primeiro, depois XLSX — basta manter um deles no repositório
+const CLOUD_FILES=['Lista.csv','Lista.xlsx'];
 async function loadCloud(){
-  try{
-    const url=CLOUD_FILE+'?v='+Date.now(); // evita cache antigo
-    const resp=await fetch(url,{cache:'no-store'});
-    if(!resp.ok) return false;
-    const buf=await resp.arrayBuffer();
-    const rows=rowsFromArrayBuffer(buf);
-    if(rows.length<2) return false;
-    return buildDB(rows,CLOUD_FILE,true);
-  }catch(err){console.warn('Base compartilhada indisponível:',err);return false;}
+  for(const f of CLOUD_FILES){
+    try{
+      const resp=await fetch(f+'?v='+Date.now(),{cache:'no-store'});
+      if(!resp.ok) continue;
+      const buf=await resp.arrayBuffer();
+      const rows=rowsFromArrayBuffer(buf);
+      if(rows.length<2) continue;
+      if(buildDB(rows,f,true)) return true;
+    }catch(err){console.warn('Falha em',f,err);}
+  }
+  return false;
 }
 
 /* ---------- Boot ---------- */
