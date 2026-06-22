@@ -295,9 +295,12 @@ function rowsFromArrayBuffer(buf){
     if(text==null || /\uFFFD/.test(text)){
       text=new TextDecoder('windows-1252').decode(bytes); // acentos do Excel BR
     }
-    const wb=XLSX.read(text,{type:'string',raw:false}); // SheetJS detecta ; ou , sozinho
-    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    // raw:true preserva o texto original dos números (ex: "1.999,80"),
+    // evitando que o SheetJS coma a vírgula decimal. A conversão fica com toNum.
+    const wb=XLSX.read(text,{type:'string',raw:true});
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});
   }
+  // XLSX nativo: números já vêm corretos; lê normal
   const wb=XLSX.read(buf,{type:'array'});
   return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
 }
