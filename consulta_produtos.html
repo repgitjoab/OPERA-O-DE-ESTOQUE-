@@ -243,7 +243,29 @@
 const $=id=>document.getElementById(id);
 let DB=[], INDEX={}, RECENT=[];
 const norm=v=>(v==null?'':String(v)).trim().toUpperCase().replace(/\s+/g,'');
-function toNum(v){if(v==null||v==='')return 0;let s=String(v).trim().replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isNaN(n)?0:n;}
+function toNum(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v; // XLSX já entrega número
+  let s=String(v).trim().replace(/[R$\s]/g,'');
+  if(s==='')return 0;
+  const temVirg=s.includes(','), temPonto=s.includes('.');
+  if(temVirg&&temPonto){
+    // o que vier por último é o decimal; o outro é separador de milhar
+    if(s.lastIndexOf(',')>s.lastIndexOf('.')) s=s.replace(/\./g,'').replace(',','.'); // BR: 1.234,56
+    else s=s.replace(/,/g,'');                                                         // US: 1,234.56
+  }else if(temVirg){
+    s=s.replace(',','.');            // só vírgula -> decimal BR
+  }else if(temPonto){
+    // só ponto: pode ser decimal (87.16) ou milhar (1.234). Heurística:
+    const p=s.split('.');
+    if(p.length>2 || (p[1]&&p[1].length===3 && p[0].length<=3 && !/^0/.test(p[1]))){
+      // vários pontos OU formato típico de milhar (3 casas após) -> remove pontos
+      s=s.replace(/\./g,'');
+    } // senão, mantém o ponto como decimal
+  }
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
 function findCol(h,names){const H=h.map(norm);for(const n of names){const i=H.indexOf(norm(n));if(i>=0)return i;}for(let i=0;i<H.length;i++)for(const n of names)if(H[i].includes(norm(n)))return i;return -1;}
 
 /* ---------- IndexedDB (offline) ---------- */
