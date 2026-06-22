@@ -108,10 +108,7 @@
   .res-row.col .lbl{flex:none;margin-bottom:10px}
   .multi-badge{display:inline-block;margin-top:9px;background:rgba(255,255,255,.18);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600}
   .loc-list{display:flex;flex-direction:column;gap:8px}
-  .loc-line{display:flex;align-items:center;justify-content:space-between;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
-  .loc-tag{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--brand);font-size:18px}
-  .loc-qty{font-size:22px;font-weight:800;display:flex;align-items:baseline;gap:4px}
-  .loc-qty small{font-size:12px;font-weight:600;color:var(--mist)}
+  .loc-tag-line{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--brand);font-size:20px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
 
   .notfound{background:var(--bad-soft);border:1px solid #f3c6bf;border-radius:var(--r);padding:24px;text-align:center;color:var(--bad)}
   .notfound .ic{font-size:38px}
@@ -327,34 +324,32 @@ function fmtQty(q){return Number.isInteger(q)?q:q.toLocaleString('pt-BR',{maximu
 function showResult(recs){
   const first=recs[0];
   pushRecent(first.codigo);
-  const total=recs.reduce((s,r)=>s+(r.quantidade||0),0);
-  // descrição/fornecedor: usa o primeiro não-vazio
+  // A base repete o total do item em cada linha -> NÃO somar.
+  // Quantidade do item = maior valor encontrado (todas as linhas trazem o mesmo total).
+  const qtdItem=recs.reduce((m,r)=>Math.max(m,r.quantidade||0),0);
   const desc=recs.map(r=>r.descricao).find(Boolean)||'(sem descrição)';
   const forn=recs.map(r=>r.fornecedor).find(Boolean)||'—';
 
-  // ordena locações: maior quantidade primeiro
-  const locs=[...recs].sort((a,b)=>(b.quantidade||0)-(a.quantidade||0));
+  // locações únicas (sem repetir a mesma)
+  const vistos=new Set(), locs=[];
+  recs.forEach(r=>{const L=(r.locacao||'—').trim();const k=L.toUpperCase();if(!vistos.has(k)){vistos.add(k);locs.push(L);}});
   const multi=locs.length>1;
 
-  const locRows=locs.map(r=>`
-     <div class="loc-line">
-       <div class="loc-tag">${r.locacao||'—'}</div>
-       <div class="loc-qty ${r.quantidade>0?'qty-ok':'qty-zero'}">${fmtQty(r.quantidade)}<small>un</small></div>
-     </div>`).join('');
+  const locTags=locs.map(L=>`<div class="loc-tag-line">${L}</div>`).join('');
 
   $('result').innerHTML=`
    <div class="res-card">
      <div class="res-top">
        <div class="code">CÓD ${first.codigo}</div>
        <div class="desc">${desc}</div>
-       ${multi?`<div class="multi-badge">${locs.length} locações · total ${fmtQty(total)} un</div>`:''}
+       ${multi?`<div class="multi-badge">Item em ${locs.length} locações</div>`:''}
      </div>
      <div class="res-grid">
+       <div class="res-row big"><div class="lbl">Quantidade</div><div class="val ${qtdItem>0?'qty-ok':'qty-zero'}">${fmtQty(qtdItem)}</div></div>
        <div class="res-row col">
-         <div class="lbl">${multi?'Locações e quantidades':'Locação'}</div>
-         <div class="loc-list">${locRows}</div>
+         <div class="lbl">${multi?'Locações':'Locação'}</div>
+         <div class="loc-list">${locTags}</div>
        </div>
-       ${multi?`<div class="res-row big"><div class="lbl">Total geral</div><div class="val ${total>0?'qty-ok':'qty-zero'}">${fmtQty(total)}</div></div>`:''}
        <div class="res-row"><div class="lbl">Fornecedor</div><div class="val">${forn}</div></div>
      </div>
    </div>`;
