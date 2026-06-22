@@ -164,6 +164,8 @@
   .scanner-hint{padding:16px 20px calc(var(--safe-bot) + 24px);color:#cfd8e6;text-align:center;font-size:13.5px;background:rgba(0,0,0,.5)}
 
   .install-tip{background:var(--brand-soft);border:1px solid #c3d8fb;border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--ink-2);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start}
+  .atualizacao{background:var(--ok-soft);border:1px solid #bfe6d2;border-radius:10px;padding:9px 14px;font-size:12.5px;color:var(--ink-2);margin-bottom:14px;text-align:center}
+  .atualizacao b{color:var(--ok)}
   .install-tip .x{margin-left:auto;cursor:pointer;color:var(--mist);font-weight:700;flex:0 0 auto}
   .hidden{display:none!important}
 </style>
@@ -176,6 +178,8 @@
 </header>
 
 <div class="wrap">
+
+  <div class="atualizacao hidden" id="atualizacao"></div>
 
   <div class="install-tip" id="installTip">
     <span>📲</span>
@@ -556,13 +560,30 @@ async function loadCloud(){
     try{
       const resp=await fetch(f+'?v='+Date.now(),{cache:'no-store'});
       if(!resp.ok) continue;
+      const lm=resp.headers.get('Last-Modified'); // data em que o arquivo foi atualizado no GitHub
       const buf=await resp.arrayBuffer();
       const rows=rowsFromArrayBuffer(buf);
       if(rows.length<2) continue;
-      if(buildDB(rows,f,true)) return true;
+      if(buildDB(rows,f,true)){
+        const ts=lm?new Date(lm).getTime():Date.now();
+        idbSet('estoqueDate',ts);     // guarda p/ uso offline
+        showAtualizacao(ts);
+        return true;
+      }
     }catch(err){console.warn('Falha em',f,err);}
   }
   return false;
+}
+
+function showAtualizacao(ts){
+  const el=$('atualizacao');
+  if(!el)return;
+  if(!ts){el.classList.add('hidden');return;}
+  const d=new Date(ts);
+  const dia=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const hora=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`🕒 Estoque atualizado em <b>${dia}</b> às <b>${hora}</b>`;
+  el.classList.remove('hidden');
 }
 
 /* ---------- Boot ---------- */
@@ -585,6 +606,7 @@ async function loadCloud(){
     const dt=await idbGet('dbDate');
     const when=dt?new Date(dt).toLocaleDateString('pt-BR'):'sessão anterior';
     afterLoad(nm,DB.length,when+' (offline)');
+    showAtualizacao(await idbGet('estoqueDate'));
   }else{
     // 3) nada salvo e sem base online: oferece importação manual
     $('cardEmptyState').classList.remove('hidden');
