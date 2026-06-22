@@ -110,6 +110,35 @@
   .loc-list{display:flex;flex-direction:column;gap:8px}
   .loc-tag-line{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--brand);font-size:20px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
 
+  /* Calculadora */
+  .calc{border-top:1px solid var(--line);padding:18px 20px;background:#fbfcfe}
+  .calc.no-cost{color:var(--mist);font-size:13px;text-align:center}
+  .calc-head{font-size:14px;font-weight:700;margin-bottom:10px}
+  .calc-info{font-size:12.5px;color:var(--slate);margin-bottom:16px}
+  .calc-info b{color:var(--ink)}
+  .tax-on{display:inline-block;background:var(--ok-soft);color:var(--ok);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;margin-left:6px}
+  .tax-off{display:inline-block;background:var(--paper);color:var(--mist);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600;margin-left:6px}
+  .calc-row{display:flex;gap:12px}
+  .calc-field{flex:1}
+  .calc-field.full{margin-top:4px}
+  .calc-field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mist);font-weight:700;margin-bottom:5px}
+  .calc-field input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px 12px;font-size:16px;font-weight:700;font-family:inherit;color:var(--ink);-webkit-appearance:none}
+  .calc-field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  .margin-chips{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}
+  .mchip{border:1.5px solid var(--line);background:var(--white);border-radius:20px;padding:8px 14px;font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer;font-family:inherit;flex:1;min-width:58px}
+  .mchip:active{background:var(--brand-soft)}
+  .mchip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .calc-out{background:var(--ink);color:#fff;border-radius:12px;padding:16px 18px;text-align:center;margin-top:6px}
+  .calc-out.alt{background:linear-gradient(120deg,var(--brand),#2f7bf0)}
+  .calc-out-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;opacity:.8}
+  .calc-out-val{font-size:30px;font-weight:800;margin-top:3px;line-height:1.1}
+  .calc-out-val.qty-ok{color:#5ff0a8} .calc-out-val.qty-zero{color:#ff9a8a}
+  .calc-out-sub{font-size:12px;opacity:.85;margin-top:5px}
+  .calc-desc{font-size:13px;font-weight:600;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.15);color:#9fe0c0}
+  .calc-desc b{color:#5ff0a8;font-size:15px}
+  .calc-desc .acima{color:#ff9a8a}
+  .calc-sep{text-align:center;font-size:11.5px;color:var(--mist);margin:18px 0 12px;text-transform:uppercase;letter-spacing:.5px}
+
   .notfound{background:var(--bad-soft);border:1px solid #f3c6bf;border-radius:var(--r);padding:24px;text-align:center;color:var(--bad)}
   .notfound .ic{font-size:38px}
   .notfound b{display:block;font-size:16px;margin-top:8px}
@@ -263,6 +292,10 @@ function buildDB(rows,fname,fromCloud){
   const cForn=findCol(h,['Nome Fornecedor','Fornecedor']);
   const cQtd=findCol(h,['Qtde','Quantidade','Qtd','Est.','Estoque','Est','Saldo']);
   const cLoc=findCol(h,['Locacao','Locação','Local Estoque','Local','Endereço']);
+  const cCusto=findCol(h,['C Cst Ctbil','Custo Contábil','Custo Contabil','C Cst Ctbl','Cst Ctbil']);
+  const cPis=findCol(h,['Possui Pis','Possui PIS','Pis','PIS']);
+  const cCofins=findCol(h,['Possui Cofins','Possui COFINS','Cofins','COFINS']);
+  const cTabela=findCol(h,['Pven For','Pven Fornecedor','Preço Tabela','Preco Tabela','Pven']);
   if(cCod<0){if(!fromCloud)alert('Coluna "Código" não encontrada.');return false;}
   DB=[];INDEX={};
   for(let i=1;i<rows.length;i++){const r=rows[i];const cod=r[cCod];
@@ -271,7 +304,10 @@ function buildDB(rows,fname,fromCloud){
       descricao:cDesc>=0?String(r[cDesc]??'').trim():'',
       fornecedor:cForn>=0?String(r[cForn]??'').trim():'',
       quantidade:cQtd>=0?toNum(r[cQtd]):0,
-      locacao:cLoc>=0?String(r[cLoc]??'').trim():''};
+      locacao:cLoc>=0?String(r[cLoc]??'').trim():'',
+      custo:cCusto>=0?toNum(r[cCusto]):0,
+      tabela:cTabela>=0?toNum(r[cTabela]):0,
+      pisCofins:(()=>{const sim=v=>/^S/i.test(String(v??'').trim());return (cPis>=0&&sim(r[cPis]))||(cCofins>=0&&sim(r[cCofins]));})()};
     DB.push(rec);
     const k=norm(rec.codigo);
     if(!INDEX[k]) INDEX[k]=[];
@@ -329,6 +365,9 @@ function showResult(recs){
   const qtdItem=recs.reduce((m,r)=>Math.max(m,r.quantidade||0),0);
   const desc=recs.map(r=>r.descricao).find(Boolean)||'(sem descrição)';
   const forn=recs.map(r=>r.fornecedor).find(Boolean)||'—';
+  const custo=recs.reduce((m,r)=>Math.max(m,r.custo||0),0);
+  const tabela=recs.reduce((m,r)=>Math.max(m,r.tabela||0),0);
+  const pisCofins=recs.some(r=>r.pisCofins);
 
   // locações únicas (sem repetir a mesma)
   const vistos=new Set(), locs=[];
@@ -336,6 +375,48 @@ function showResult(recs){
   const multi=locs.length>1;
 
   const locTags=locs.map(L=>`<div class="loc-tag-line">${L}</div>`).join('');
+
+  // guarda dados p/ a calculadora
+  CALC={custo,pisCofins,tabela};
+
+  const calcBlock = custo>0 ? `
+     <div class="calc">
+       <div class="calc-head">💰 Precificação por margem</div>
+       <div class="calc-info">
+         Custo contábil <b>${money(custo)}</b>
+         ${pisCofins?'<span class="tax-on">+ PIS/COFINS 9,25%</span>':'<span class="tax-off">sem PIS/COFINS</span>'}
+         ${tabela>0?`<br>Preço de tabela <b>${money(tabela)}</b>`:''}
+       </div>
+       <div class="calc-row">
+         <div class="calc-field">
+           <label>ICMS (%)</label>
+           <input type="text" inputmode="decimal" id="calcIcms" value="19" oninput="recalcMargem()">
+         </div>
+         <div class="calc-field">
+           <label>Margem (%)</label>
+           <input type="text" inputmode="decimal" id="calcMargem" placeholder="ex: 20" oninput="recalcMargem()">
+         </div>
+       </div>
+       <div class="margin-chips" id="marginChips">
+         ${[10,15,20,25,30,35,40,45].map(m=>`<button class="mchip" onclick="setMargem(${m})">${m}%</button>`).join('')}
+       </div>
+       <div class="calc-out" id="outVenda">
+         <div class="calc-out-lbl">Preço de venda sugerido</div>
+         <div class="calc-out-val" id="vendaVal">—</div>
+         <div class="calc-out-sub" id="lucroVal"></div>
+         <div class="calc-desc" id="descVal"></div>
+       </div>
+       <div class="calc-sep">ou informe um preço e veja a margem</div>
+       <div class="calc-field full">
+         <label>Preço de venda (R$)</label>
+         <input type="text" inputmode="decimal" id="calcPreco" placeholder="ex: 168,43" oninput="recalcPreco()">
+       </div>
+       <div class="calc-out alt" id="outMargem">
+         <div class="calc-out-lbl">Margem desse preço</div>
+         <div class="calc-out-val" id="margemVal">—</div>
+         <div class="calc-out-sub" id="margemSub"></div>
+       </div>
+     </div>` : `<div class="calc no-cost">Sem custo contábil cadastrado para este item — não é possível calcular o preço.</div>`;
 
   $('result').innerHTML=`
    <div class="res-card">
@@ -352,9 +433,56 @@ function showResult(recs){
        </div>
        <div class="res-row"><div class="lbl">Fornecedor</div><div class="val">${forn}</div></div>
      </div>
+     ${calcBlock}
    </div>`;
   $('result').classList.add('show');
   $('result').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ---------- Calculadora de preço ---------- */
+let CALC={custo:0,pisCofins:false};
+function money(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function pctNum(id){const v=parseFloat(String($(id)?.value??'').replace(',','.'));return isNaN(v)?null:v;}
+function taxaFixa(){return CALC.pisCofins?9.25:0;} // PIS/COFINS uma vez
+
+function setMargem(m){const el=$('calcMargem');if(el){el.value=m;recalcMargem();}}
+
+function recalcMargem(){
+  const icms=pctNum('calcIcms')??0;
+  const margem=pctNum('calcMargem');
+  // destaca chip ativo
+  document.querySelectorAll('.mchip').forEach(b=>b.classList.toggle('on',parseFloat(b.textContent)===margem));
+  if(margem===null||CALC.custo<=0){$('vendaVal').textContent='—';$('lucroVal').textContent='';$('descVal').textContent='';return;}
+  const div=1-(icms/100)-(taxaFixa()/100)-(margem/100);
+  if(div<=0){$('vendaVal').textContent='inválido';$('lucroVal').textContent='ICMS + PIS/COFINS + margem ≥ 100%';$('descVal').textContent='';return;}
+  const preco=CALC.custo/div;
+  const lucro=preco*(margem/100);
+  $('vendaVal').textContent=money(preco);
+  $('lucroVal').textContent='Lucro: '+money(lucro)+' • impostos: '+money(preco*((icms+taxaFixa())/100));
+  // desconto sobre o preço de tabela
+  const d=$('descVal');
+  if(CALC.tabela>0){
+    const dif=CALC.tabela-preco;
+    const pct=(dif/CALC.tabela)*100;
+    if(dif>=0) d.innerHTML=`Tabela ${money(CALC.tabela)} → desconto de <b>${pct.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</b> (${money(dif)})`;
+    else d.innerHTML=`<span class="acima">Acima da tabela ${money(CALC.tabela)} em ${money(-dif)} (+${(-pct).toLocaleString('pt-BR',{maximumFractionDigits:1})}%)</span>`;
+  } else d.textContent='';
+}
+function recalcPreco(){
+  const icms=pctNum('calcIcms')??0;
+  const preco=pctNum('calcPreco'); // reaproveita parser (aceita vírgula)
+  if(preco===null||preco<=0||CALC.custo<=0){$('margemVal').textContent='—';$('margemSub').textContent='';return;}
+  // margem = 1 - icms - pisCofins - (custo/preco), tudo em fração do preço
+  const margemFrac=1-(icms/100)-(taxaFixa()/100)-(CALC.custo/preco);
+  const margemPct=margemFrac*100;
+  const lucro=preco*margemFrac;
+  $('margemVal').textContent=margemPct.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+  $('margemVal').className='calc-out-val '+(margemPct<0?'qty-zero':'qty-ok');
+  let sub=(margemPct<0?'Prejuízo: ':'Lucro: ')+money(lucro)+' • impostos: '+money(preco*((icms+taxaFixa())/100));
+  if(CALC.tabela>0){const dif=CALC.tabela-preco;const pct=(dif/CALC.tabela)*100;
+    sub+= dif>=0 ? ' • desconto '+pct.toLocaleString('pt-BR',{maximumFractionDigits:1})+'% da tabela'
+                 : ' • '+(-pct).toLocaleString('pt-BR',{maximumFractionDigits:1})+'% acima da tabela';}
+  $('margemSub').textContent=sub;
 }
 function showNotFound(code){
   $('result').innerHTML=`<div class="notfound"><div class="ic">⚠️</div><b>Produto não encontrado</b><small>Código ${code} não está na base importada.</small></div>`;
