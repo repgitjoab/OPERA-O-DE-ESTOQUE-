@@ -10,6 +10,8 @@
 <title>Consulta de Produtos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --ink:#0e1b2c; --ink-2:#1d3148; --slate:#5a6b80; --mist:#8a99ab;
@@ -168,6 +170,73 @@
   .atualizacao b{color:var(--ok)}
   .install-tip .x{margin-left:auto;cursor:pointer;color:var(--mist);font-weight:700;flex:0 0 auto}
   .hidden{display:none!important}
+
+  /* Botão adicionar ao orçamento */
+  .btn-add-orc{width:100%;margin-top:14px;border:none;border-radius:12px;background:var(--ok);color:#fff;font-size:15px;font-weight:700;padding:15px;font-family:inherit;cursor:pointer}
+  .btn-add-orc:active{filter:brightness(.93)}
+  .btn-add-orc.added{background:var(--ink)}
+
+  /* FAB orçamento */
+  .orc-fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-bot) + 16px);z-index:60;
+    background:linear-gradient(120deg,var(--brand),#2f7bf0);color:#fff;font-weight:700;font-size:15px;
+    padding:14px 22px;border-radius:30px;box-shadow:0 8px 24px rgba(11,92,216,.4);cursor:pointer;
+    display:none;align-items:center;gap:10px}
+  .orc-fab.show{display:flex}
+  .orc-count{background:#fff;color:var(--brand);border-radius:20px;min-width:24px;height:24px;display:grid;place-items:center;font-size:13px;font-weight:800;padding:0 6px}
+
+  /* Modal orçamento */
+  .orc-modal{position:fixed;inset:0;background:rgba(14,27,44,.55);z-index:90;display:none;flex-direction:column;backdrop-filter:blur(2px)}
+  .orc-modal.show{display:flex}
+  .orc-sheet{margin-top:auto;background:var(--paper);border-radius:20px 20px 0 0;max-height:94vh;display:flex;flex-direction:column;width:100%;max-width:560px;margin-left:auto;margin-right:auto}
+  .orc-bar{display:flex;align-items:center;gap:12px;padding:calc(var(--safe-top) + 6px) 16px 12px;border-bottom:1px solid var(--line)}
+  .orc-bar b{font-size:16px}
+  .orc-back{background:var(--white);border:1px solid var(--line);width:38px;height:38px;border-radius:10px;font-size:18px;cursor:pointer}
+  .orc-clear{margin-left:auto;background:none;border:none;color:var(--bad);font-weight:600;font-size:13px;cursor:pointer}
+  .orc-scroll{overflow-y:auto;padding:14px;flex:1;-webkit-overflow-scrolling:touch}
+
+  /* Documento do orçamento */
+  .orc-doc{background:#fff;border-radius:14px;padding:22px;box-shadow:var(--shadow)}
+  .orc-doc-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:14px}
+  .orc-brand{display:flex;gap:10px;align-items:center}
+  .orc-logo{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--brand),#3f8bff);color:#fff;display:grid;place-items:center;font-weight:800;font-size:24px}
+  .orc-brand-name{font-size:18px;font-weight:800;color:var(--ink)}
+  .orc-brand-sub{font-size:11px;color:var(--slate);letter-spacing:.5px;text-transform:uppercase}
+  .orc-doc-title{text-align:right}
+  .orc-doc-t{font-size:17px;font-weight:800;color:var(--brand);letter-spacing:1px}
+  .orc-doc-date{font-size:11px;color:var(--mist);margin-top:3px}
+  .orc-cliente{margin-bottom:16px}
+  .orc-cliente label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--mist);font-weight:700;display:block;margin-bottom:5px}
+  .orc-cliente input{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:10px 12px;font-size:15px;font-family:inherit;font-weight:600}
+  .orc-cli-fixo{font-size:16px;font-weight:700;color:var(--ink);padding:4px 0}
+
+  .orc-itens{display:flex;flex-direction:column;gap:10px}
+  .orc-item{position:relative;border:1px solid var(--line);border-radius:11px;padding:13px 14px;background:#fff}
+  .orc-del{position:absolute;top:9px;right:9px;background:var(--bad-soft);color:var(--bad);border:none;width:24px;height:24px;border-radius:50%;font-size:12px;cursor:pointer;font-weight:700}
+  .orc-item-desc{font-size:14.5px;font-weight:700;color:var(--ink);padding-right:28px;line-height:1.3}
+  .orc-item-cod{font-size:11.5px;color:var(--mist);margin-top:2px;font-family:ui-monospace,Menlo,monospace}
+  .orc-item-vals{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:9px}
+  .oi-tabela{font-size:12.5px;color:var(--mist);text-decoration:line-through}
+  .oi-desc{font-size:12px;font-weight:700;color:var(--ok);background:var(--ok-soft);padding:2px 8px;border-radius:20px}
+  .oi-preco{font-size:19px;font-weight:800;color:var(--brand);margin-left:auto}
+  .orc-item-qtd{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}
+  .orc-item-qtd label{font-size:12px;color:var(--slate);font-weight:600}
+  .orc-item-qtd input{width:62px;border:1.5px solid var(--line);border-radius:8px;padding:7px;text-align:center;font-size:15px;font-weight:700;font-family:inherit}
+  .qtd-fixo{font-size:15px;font-weight:700;min-width:30px;text-align:center}
+  .oi-subtotal{margin-left:auto;font-size:15px;font-weight:700;color:var(--ink)}
+
+  .orc-foot{margin-top:18px;border-top:2px solid var(--line);padding-top:14px}
+  .orc-economia{font-size:13px;color:var(--ok);text-align:right;margin-bottom:8px}
+  .orc-economia b{font-weight:800}
+  .orc-total-box{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:11px;padding:14px 18px}
+  .orc-total-box span{font-size:13px;opacity:.85}
+  .orc-total-box b{font-size:24px;font-weight:800}
+  .orc-rodape{font-size:10px;color:var(--mist);text-align:center;margin-top:14px;line-height:1.5}
+
+  .orc-actions{display:flex;gap:10px;padding:12px 16px calc(var(--safe-bot) + 16px);border-top:1px solid var(--line);background:var(--white)}
+  .btn-exp{flex:1;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:#fff}
+  .btn-exp.pdf{background:var(--bad)}
+  .btn-exp.png{background:var(--brand)}
+  .btn-exp:active{filter:brightness(.93)}
 </style>
 </head>
 <body>
@@ -231,6 +300,57 @@
     <div class="empty"><div class="ic">📦</div><p>Importe a base para começar a consultar.</p></div>
   </div>
 
+</div>
+
+<!-- Botão flutuante do orçamento -->
+<div class="orc-fab" id="orcFab" onclick="abrirOrcamento()">
+  🧾 Ir para orçamento <span class="orc-count" id="orcCount">0</span>
+</div>
+
+<!-- Modal de orçamento -->
+<div class="orc-modal" id="orcModal">
+  <div class="orc-sheet">
+    <div class="orc-bar">
+      <button class="orc-back" onclick="fecharOrcamento()">←</button>
+      <b>Orçamento</b>
+      <button class="orc-clear" onclick="limparOrcamento()">Limpar</button>
+    </div>
+    <div class="orc-scroll">
+      <!-- Documento que será exportado -->
+      <div class="orc-doc" id="orcDoc">
+        <div class="orc-doc-head">
+          <div class="orc-brand">
+            <div class="orc-logo">J</div>
+            <div>
+              <div class="orc-brand-name">Jorlan GO</div>
+              <div class="orc-brand-sub">Atacado de Peças</div>
+            </div>
+          </div>
+          <div class="orc-doc-title">
+            <div class="orc-doc-t">ORÇAMENTO</div>
+            <div class="orc-doc-date" id="orcDocDate"></div>
+          </div>
+        </div>
+        <div class="orc-cliente">
+          <label>Cliente</label>
+          <input type="text" id="orcCliente" placeholder="Nome do cliente (opcional)" oninput="syncCliente()">
+        </div>
+        <div class="orc-itens" id="orcItens"></div>
+        <div class="orc-foot">
+          <div class="orc-economia" id="orcEconomia"></div>
+          <div class="orc-total-box">
+            <span>Total do orçamento</span>
+            <b id="orcTotal">R$ 0,00</b>
+          </div>
+        </div>
+        <div class="orc-rodape">Jorlan GO · Atacado de Peças · Orçamento sujeito a confirmação de estoque e validade de 7 dias.</div>
+      </div>
+    </div>
+    <div class="orc-actions">
+      <button class="btn-exp pdf" onclick="exportarOrc('pdf')">⬇ PDF</button>
+      <button class="btn-exp png" onclick="exportarOrc('png')">🖼 PNG</button>
+    </div>
+  </div>
 </div>
 
 <!-- Scanner -->
@@ -406,7 +526,7 @@ function showResult(recs){
   const locTags=locs.map(L=>`<div class="loc-tag-line">${L}</div>`).join('');
 
   // guarda dados p/ a calculadora
-  CALC={custo,pisCofins,tabela};
+  CALC={custo,pisCofins,tabela,codigo:first.codigo,descricao:desc,fornecedor:forn};
 
   const calcBlock = custo>0 ? `
      <div class="calc">
@@ -435,6 +555,7 @@ function showResult(recs){
          <div class="calc-out-sub" id="lucroVal"></div>
          <div class="calc-desc" id="descVal"></div>
        </div>
+       <button class="btn-add-orc" id="btnAddOrc" onclick="addAoOrcamento()">➕ Adicionar ao orçamento</button>
        <div class="calc-sep">ou informe um preço e veja a margem</div>
        <div class="calc-field full">
          <label>Preço de venda (R$)</label>
@@ -481,11 +602,12 @@ function recalcMargem(){
   const margem=pctNum('calcMargem');
   // destaca chip ativo
   document.querySelectorAll('.mchip').forEach(b=>b.classList.toggle('on',parseFloat(b.textContent)===margem));
-  if(margem===null||CALC.custo<=0){$('vendaVal').textContent='—';$('lucroVal').textContent='';$('descVal').textContent='';return;}
+  if(margem===null||CALC.custo<=0){$('vendaVal').textContent='—';$('lucroVal').textContent='';$('descVal').textContent='';CALC.precoAtual=0;return;}
   const div=1-(icms/100)-(taxaFixa()/100)-(margem/100);
-  if(div<=0){$('vendaVal').textContent='inválido';$('lucroVal').textContent='ICMS + PIS/COFINS + margem ≥ 100%';$('descVal').textContent='';return;}
+  if(div<=0){$('vendaVal').textContent='inválido';$('lucroVal').textContent='ICMS + PIS/COFINS + margem ≥ 100%';$('descVal').textContent='';CALC.precoAtual=0;return;}
   const preco=CALC.custo/div;
   const lucro=preco*(margem/100);
+  CALC.precoAtual=preco;
   $('vendaVal').textContent=money(preco);
   $('lucroVal').textContent='Lucro: '+money(lucro)+' • impostos: '+money(preco*((icms+taxaFixa())/100));
   // desconto sobre o preço de tabela
@@ -501,6 +623,7 @@ function recalcPreco(){
   const icms=pctNum('calcIcms')??0;
   const preco=pctNum('calcPreco'); // reaproveita parser (aceita vírgula)
   if(preco===null||preco<=0||CALC.custo<=0){$('margemVal').textContent='—';$('margemSub').textContent='';return;}
+  CALC.precoAtual=preco;
   // margem = 1 - icms - pisCofins - (custo/preco), tudo em fração do preço
   const margemFrac=1-(icms/100)-(taxaFixa()/100)-(CALC.custo/preco);
   const margemPct=margemFrac*100;
@@ -516,6 +639,139 @@ function recalcPreco(){
 function showNotFound(code){
   $('result').innerHTML=`<div class="notfound"><div class="ic">⚠️</div><b>Produto não encontrado</b><small>Código ${code} não está na base importada.</small></div>`;
   $('result').classList.add('show');
+}
+
+/* ---------- Orçamento (carrinho) ---------- */
+let ORC=[]; // {codigo, descricao, fornecedor, tabela, preco, desconto, qtd}
+function addAoOrcamento(){
+  if(!CALC.precoAtual||CALC.precoAtual<=0){
+    alert('Defina uma margem ou preço de venda antes de adicionar ao orçamento.');return;
+  }
+  const desconto = CALC.tabela>0 ? ((CALC.tabela-CALC.precoAtual)/CALC.tabela*100) : 0;
+  // se já existe o código, atualiza
+  const ix=ORC.findIndex(i=>norm(i.codigo)===norm(CALC.codigo));
+  const item={codigo:CALC.codigo,descricao:CALC.descricao,fornecedor:CALC.fornecedor,
+    tabela:CALC.tabela,preco:CALC.precoAtual,desconto:desconto,qtd:(ix>=0?ORC[ix].qtd:1)};
+  if(ix>=0)ORC[ix]=item; else ORC.push(item);
+  idbSet('orc',ORC);
+  updateOrcBadge();
+  // feedback visual no botão
+  const b=$('btnAddOrc'); if(b){const t=b.textContent;b.textContent='✓ Adicionado!';b.classList.add('added');setTimeout(()=>{b.textContent=t;b.classList.remove('added');},1300);}
+}
+function updateOrcBadge(){
+  const n=ORC.length;
+  const fab=$('orcFab'), cnt=$('orcCount');
+  if(n>0){fab.classList.add('show');cnt.textContent=n;}
+  else fab.classList.remove('show');
+}
+function abrirOrcamento(){
+  if(!ORC.length){alert('Nenhum item no orçamento ainda.');return;}
+  renderOrcamento();
+  $('orcModal').classList.add('show');
+}
+function fecharOrcamento(){$('orcModal').classList.remove('show');}
+function removerItemOrc(i){ORC.splice(i,1);idbSet('orc',ORC);updateOrcBadge();renderOrcamento();if(!ORC.length)fecharOrcamento();}
+function setQtdOrc(i,v){const q=parseInt(String(v).replace(/\D/g,''))||1;ORC[i].qtd=Math.max(1,q);idbSet('orc',ORC);renderOrcTotais();}
+function limparOrcamento(){if(confirm('Limpar todos os itens do orçamento?')){ORC=[];idbSet('orc',ORC);updateOrcBadge();fecharOrcamento();}}
+
+function renderOrcamento(){
+  const body=$('orcItens');
+  body.innerHTML=ORC.map((it,i)=>`
+    <div class="orc-item">
+      <button class="orc-del" onclick="removerItemOrc(${i})">✕</button>
+      <div class="orc-item-desc">${it.descricao}</div>
+      <div class="orc-item-cod">Cód ${it.codigo}${it.fornecedor&&it.fornecedor!=='—'?' · '+it.fornecedor:''}</div>
+      <div class="orc-item-vals">
+        ${it.tabela>0?`<span class="oi-tabela">Tabela ${money(it.tabela)}</span>`:''}
+        ${it.desconto>0?`<span class="oi-desc">−${it.desconto.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>`:''}
+        <span class="oi-preco">${money(it.preco)}</span>
+      </div>
+      <div class="orc-item-qtd">
+        <label>Qtd:</label>
+        <input type="text" inputmode="numeric" value="${it.qtd}" oninput="setQtdOrc(${i},this.value)">
+        <span class="oi-subtotal">= ${money(it.preco*it.qtd)}</span>
+      </div>
+    </div>`).join('');
+  renderOrcTotais();
+}
+function renderOrcTotais(){
+  // recalcula subtotais exibidos
+  ORC.forEach((it,i)=>{const el=document.querySelectorAll('.oi-subtotal')[i];if(el)el.textContent='= '+money(it.preco*it.qtd);});
+  const totalTabela=ORC.reduce((s,it)=>s+(it.tabela||it.preco)*it.qtd,0);
+  const total=ORC.reduce((s,it)=>s+it.preco*it.qtd,0);
+  const economia=totalTabela-total;
+  $('orcTotal').textContent=money(total);
+  const ec=$('orcEconomia');
+  if(economia>0){ec.style.display='block';ec.innerHTML=`Economia de <b>${money(economia)}</b> sobre a tabela`;}
+  else ec.style.display='none';
+}
+let CLIENTE_NOME='';
+function syncCliente(){CLIENTE_NOME=$('orcCliente').value;}
+function dataHoje(){
+  const d=new Date();
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function exportarOrc(tipo){
+  if(!ORC.length){alert('Orçamento vazio.');return;}
+  $('orcDocDate').textContent=dataHoje();
+  // troca o input de cliente por texto fixo durante a captura (input não renderiza bem no canvas)
+  const cliInput=$('orcCliente');
+  const cliWrap=cliInput.parentElement;
+  const nome=cliInput.value.trim();
+  const original=cliWrap.innerHTML;
+  cliWrap.innerHTML=`<label>Cliente</label><div class="orc-cli-fixo">${nome||'—'}</div>`;
+  // troca inputs de quantidade por texto
+  const qtdInputs=[...document.querySelectorAll('.orc-item-qtd input')];
+  const qtdOrig=qtdInputs.map(inp=>inp.outerHTML);
+  qtdInputs.forEach(inp=>{const span=document.createElement('span');span.className='qtd-fixo';span.textContent=inp.value;inp.replaceWith(span);});
+  // esconde botões de excluir
+  document.querySelectorAll('.orc-del').forEach(b=>b.style.visibility='hidden');
+
+  const doc=$('orcDoc');
+  try{
+    const canvas=await html2canvas(doc,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+    const fname='orcamento_jorlan_'+(nome?nome.replace(/[^\w]+/g,'_').toLowerCase()+'_':'')+new Date().toISOString().slice(0,10);
+    if(tipo==='png'){
+      canvas.toBlob(blob=>{baixarBlob(blob,fname+'.png');});
+    }else{
+      const img=canvas.toDataURL('image/jpeg',0.95);
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const pw=pdf.internal.pageSize.getWidth();
+      const ph=pdf.internal.pageSize.getHeight();
+      const imgW=pw-20;
+      const imgH=canvas.height*imgW/canvas.width;
+      let y=10, rest=imgH;
+      if(imgH<=ph-20){
+        pdf.addImage(img,'JPEG',10,10,imgW,imgH);
+      }else{
+        // pagina se for muito longo
+        let posY=10, sY=0;
+        const pageImgH=ph-20;
+        const ratio=canvas.width/imgW;
+        while(sY<canvas.height){
+          const sliceH=Math.min(pageImgH*ratio,canvas.height-sY);
+          const c2=document.createElement('canvas');c2.width=canvas.width;c2.height=sliceH;
+          c2.getContext('2d').drawImage(canvas,0,sY,canvas.width,sliceH,0,0,canvas.width,sliceH);
+          pdf.addImage(c2.toDataURL('image/jpeg',0.95),'JPEG',10,10,imgW,sliceH/ratio);
+          sY+=sliceH; if(sY<canvas.height)pdf.addPage();
+        }
+      }
+      pdf.save(fname+'.pdf');
+    }
+  }catch(err){console.error(err);alert('Não foi possível gerar o arquivo. Tente novamente.');}
+  finally{
+    // restaura a tela editável
+    cliWrap.innerHTML=original;
+    $('orcCliente').value=nome;
+    renderOrcamento();
+  }
+}
+function baixarBlob(blob,nome){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=nome;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},500);
 }
 
 /* ---------- Recent ---------- */
@@ -593,6 +849,8 @@ function showAtualizacao(ts){
   else if(await idbGet('hideTip'))$('installTip').classList.add('hidden');
 
   RECENT=(await idbGet('recent'))||[];
+  ORC=(await idbGet('orc'))||[];
+  updateOrcBadge();
 
   // 1) tenta a base compartilhada online (todos veem a mesma)
   const online=await loadCloud();
