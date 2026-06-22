@@ -104,6 +104,14 @@
   .res-row.big .val{font-size:30px;font-weight:800}
   .res-row .val.loc{font-family:ui-monospace,Menlo,monospace;color:var(--brand);font-size:22px;font-weight:800}
   .qty-ok{color:var(--ok)} .qty-zero{color:var(--bad)}
+  .res-row.col{flex-direction:column;align-items:stretch}
+  .res-row.col .lbl{flex:none;margin-bottom:10px}
+  .multi-badge{display:inline-block;margin-top:9px;background:rgba(255,255,255,.18);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600}
+  .loc-list{display:flex;flex-direction:column;gap:8px}
+  .loc-line{display:flex;align-items:center;justify-content:space-between;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+  .loc-tag{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--brand);font-size:18px}
+  .loc-qty{font-size:22px;font-weight:800;display:flex;align-items:baseline;gap:4px}
+  .loc-qty small{font-size:12px;font-weight:600;color:var(--mist)}
 
   .notfound{background:var(--bad-soft);border:1px solid #f3c6bf;border-radius:var(--r);padding:24px;text-align:center;color:var(--bad)}
   .notfound .ic{font-size:38px}
@@ -267,7 +275,11 @@ function buildDB(rows,fname,fromCloud){
       fornecedor:cForn>=0?String(r[cForn]??'').trim():'',
       quantidade:cQtd>=0?toNum(r[cQtd]):0,
       locacao:cLoc>=0?String(r[cLoc]??'').trim():''};
-    DB.push(rec);INDEX[norm(rec.codigo)]=rec;}
+    DB.push(rec);
+    const k=norm(rec.codigo);
+    if(!INDEX[k]) INDEX[k]=[];
+    INDEX[k].push(rec);   // várias locações por código
+  }
   if(!DB.length){if(!fromCloud)alert('Nenhum item válido.');return false;}
   idbSet('db',DB);idbSet('dbName',fname);idbSet('dbDate',Date.now());
   afterLoad(fname,DB.length,fromCloud?'da base compartilhada':'agora');
@@ -292,9 +304,15 @@ searchInput.addEventListener('input',()=>{
   if(!q){sugg.classList.remove('show');return;}
   const exact=INDEX[norm(q)];
   if(exact){showResult(exact);}
-  // sugestões por prefixo/descrição
+  // sugestões por prefixo/descrição (sem repetir código)
   const nq=norm(q);
-  const matches=DB.filter(r=>norm(r.codigo).includes(nq)||norm(r.descricao).includes(nq)).slice(0,6);
+  const seen=new Set(), matches=[];
+  for(const r of DB){
+    if(matches.length>=6)break;
+    const k=norm(r.codigo);
+    if(seen.has(k))continue;
+    if(k.includes(nq)||norm(r.descricao).includes(nq)){seen.add(k);matches.push(r);}
+  }
   if(matches.length && !(exact&&matches.length===1)){
     sugg.innerHTML=matches.map(m=>`<div data-cod="${m.codigo.replace(/"/g,'&quot;')}"><span class="c">${m.codigo}</span> · <span class="d">${m.descricao||'sem descrição'}</span></div>`).join('');
     sugg.classList.add('show');
@@ -303,18 +321,41 @@ searchInput.addEventListener('input',()=>{
 });
 searchInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sugg.classList.remove('show');lookup(searchInput.value.trim());searchInput.blur();}});
 
-function lookup(code){if(!code)return;const rec=INDEX[norm(code)];if(rec)showResult(rec);else showNotFound(code);}
+function lookup(code){if(!code)return;const recs=INDEX[norm(code)];if(recs&&recs.length)showResult(recs);else showNotFound(code);}
 
 function fmtQty(q){return Number.isInteger(q)?q:q.toLocaleString('pt-BR',{maximumFractionDigits:3});}
-function showResult(r){
-  pushRecent(r.codigo);
+function showResult(recs){
+  const first=recs[0];
+  pushRecent(first.codigo);
+  const total=recs.reduce((s,r)=>s+(r.quantidade||0),0);
+  // descrição/fornecedor: usa o primeiro não-vazio
+  const desc=recs.map(r=>r.descricao).find(Boolean)||'(sem descrição)';
+  const forn=recs.map(r=>r.fornecedor).find(Boolean)||'—';
+
+  // ordena locações: maior quantidade primeiro
+  const locs=[...recs].sort((a,b)=>(b.quantidade||0)-(a.quantidade||0));
+  const multi=locs.length>1;
+
+  const locRows=locs.map(r=>`
+     <div class="loc-line">
+       <div class="loc-tag">${r.locacao||'—'}</div>
+       <div class="loc-qty ${r.quantidade>0?'qty-ok':'qty-zero'}">${fmtQty(r.quantidade)}<small>un</small></div>
+     </div>`).join('');
+
   $('result').innerHTML=`
    <div class="res-card">
-     <div class="res-top"><div class="code">CÓD ${r.codigo}</div><div class="desc">${r.descricao||'(sem descrição)'}</div></div>
+     <div class="res-top">
+       <div class="code">CÓD ${first.codigo}</div>
+       <div class="desc">${desc}</div>
+       ${multi?`<div class="multi-badge">${locs.length} locações · total ${fmtQty(total)} un</div>`:''}
+     </div>
      <div class="res-grid">
-       <div class="res-row"><div class="lbl">Locação</div><div class="val loc">${r.locacao||'—'}</div></div>
-       <div class="res-row big"><div class="lbl">Quantidade</div><div class="val ${r.quantidade>0?'qty-ok':'qty-zero'}">${fmtQty(r.quantidade)}</div></div>
-       <div class="res-row"><div class="lbl">Fornecedor</div><div class="val">${r.fornecedor||'—'}</div></div>
+       <div class="res-row col">
+         <div class="lbl">${multi?'Locações e quantidades':'Locação'}</div>
+         <div class="loc-list">${locRows}</div>
+       </div>
+       ${multi?`<div class="res-row big"><div class="lbl">Total geral</div><div class="val ${total>0?'qty-ok':'qty-zero'}">${fmtQty(total)}</div></div>`:''}
+       <div class="res-row"><div class="lbl">Fornecedor</div><div class="val">${forn}</div></div>
      </div>
    </div>`;
   $('result').classList.add('show');
@@ -391,7 +432,7 @@ async function loadCloud(){
   // 2) sem internet: usa a última base guardada no aparelho (offline)
   const saved=await idbGet('db');
   if(saved&&saved.length){
-    DB=saved;INDEX={};DB.forEach(r=>INDEX[norm(r.codigo)]=r);
+    DB=saved;INDEX={};DB.forEach(r=>{const k=norm(r.codigo);if(!INDEX[k])INDEX[k]=[];INDEX[k].push(r);});
     const nm=await idbGet('dbName')||'base salva';
     const dt=await idbGet('dbDate');
     const when=dt?new Date(dt).toLocaleDateString('pt-BR'):'sessão anterior';
